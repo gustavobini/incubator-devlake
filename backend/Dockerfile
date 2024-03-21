@@ -40,13 +40,13 @@ ARG HTTP_PROXY=
 ARG HTTPS_PROXY=
 
 RUN apt-get update
-RUN apt-get install -y gcc binutils libfindbin-libs-perl cmake libssh2-1-dev libssl-dev zlib1g-dev
+RUN apt-get install -y gcc binutils libfindbin-libs-perl cmake libssh2-1-dev libssl-dev zlib1g-dev 
 
 RUN if [ "$(arch)" != "aarch64" ] ; then \
-        apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu ; \
+    apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu ; \
     fi
 RUN if [ "$(arch)" != "x86_64" ] ; then \
-        apt-get install -y gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu ; \
+    apt-get install -y gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu ; \
     fi
 
 RUN go install github.com/vektra/mockery/v2@v2.20.0
@@ -60,24 +60,22 @@ COPY --from=debian-arm64 /usr/include /rootfs-arm64/usr/include
 COPY --from=debian-arm64 /usr/lib/aarch64-linux-gnu /rootfs-arm64/usr/lib/aarch64-linux-gnu
 COPY --from=debian-arm64 /lib/aarch64-linux-gnu /rootfs-arm64/lib/aarch64-linux-gnu
 
-
-RUN for arch in aarch64 x86_64 ; do \
-        mkdir -p /tmp/build/${arch} && cd /tmp/build/${arch} && \
-        wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.2.tar.gz -O - | tar -xz && \
-        cd libgit2-1.3.2 && \
-        mkdir build && cd build && \
-        if [ "$arch" = "aarch64" ] ; then \
-            cmake .. -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-                -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-arm64 \
-                -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
-        elif [ "$arch" = "x86_64" ] ; then \
-            cmake .. -DCMAKE_C_COMPILER=x86_64-linux-gnu-gcc \
-                -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-amd64 \
-                -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
-        fi && \
-        make -j install ; \
+RUN for arch in aarch64 ; do \
+    mkdir -p /tmp/build/${arch} && cd /tmp/build/${arch} && \
+    wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.2.tar.gz -O - | tar -xz && \
+    cd libgit2-1.3.2 && \
+    mkdir build && cd build && \
+    if [ "$arch" = "aarch64" ] ; then \
+    cmake .. -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+    -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-arm64 \
+    -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
+    elif [ "$arch" = "x86_64" ] ; then \
+    cmake .. -DCMAKE_C_COMPILER=x86_64-linux-gnu-gcc \
+    -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-amd64 \
+    -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
+    fi && \
+    make -j install ; \
     done
-
 
 FROM builder as build
 
@@ -92,13 +90,13 @@ ARG GO_PLUGINS=
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] ; then \
-        ln -s /usr/local/deps/aarch64 /usr/local/deps/target && \
-        export CC=aarch64-linux-gnu-gcc && \
-        export GOARCH=arm64 ; \
+    ln -s /usr/local/deps/aarch64 /usr/local/deps/target && \
+    export CC=aarch64-linux-gnu-gcc && \
+    export GOARCH=arm64 ; \
     else \
-        ln -s /usr/local/deps/x86_64 /usr/local/deps/target && \
-        export CC=x86_64-linux-gnu-gcc && \
-        export GOARCH=amd64 ; \
+    ln -s /usr/local/deps/x86_64 /usr/local/deps/target && \
+    export CC=x86_64-linux-gnu-gcc && \
+    export GOARCH=amd64 ; \
     fi && \
     export PKG_CONFIG_PATH=/usr/local/deps/target/lib/pkgconfig && \
     export CGO_ENABLED=1 &&\
@@ -107,11 +105,45 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # remove symlink in lib, we will recreate in final image
 RUN cd /usr/local/deps/target/lib && \
     for file in *.so* ; do \
-        if [ -L $file ] ; then \
-            unlink $file ; \
-        fi \
+    if [ -L $file ] ; then \
+    unlink $file ; \
+    fi \
     done
 
+FROM builder as test
+
+# RUN for arch in aarch64 ; do \
+#     cd /tmp/build/${arch} && \
+#     cd libgit2-1.3.2 && \
+#     cd build && \
+#     if [ "$arch" = "aarch64" ] ; then \
+#     cmake .. -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+#     -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-arm64 \
+#     -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
+#     elif [ "$arch" = "x86_64" ] ; then \
+#     cmake .. -DCMAKE_C_COMPILER=x86_64-linux-gnu-gcc \
+#     -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-amd64 \
+#     -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
+#     fi && \
+#     make -j install ; \
+#     done
+
+# RUN apt-get update && \
+#     apt-get install -y pkg-config
+
+WORKDIR /app
+COPY . /app
+ENV GOBIN=/app/bin
+ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib:/usr/local/deps/aarch64/lib/pkgconfig:/usr/local/deps/aarch64/lib
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/local/deps/aarch64/lib
+
+RUN printenv
+RUN ls -la /tmp/build/aarch64/libgit2-1.3.2/build
+RUN ls -la /usr/local/deps/aarch64/lib
+RUN ls -la /usr/local/deps/aarch64/lib/pkgconfig
+
+RUN which pkg-config
+RUN make mock && make unit-test-go
 
 FROM python:3.9-slim-bullseye as base
 
@@ -119,16 +151,16 @@ RUN apt-get update && \
     apt-get install -y python3-dev python3-pip tar pkg-config curl libssh2-1 zlib1g libffi-dev default-libmysqlclient-dev libpq-dev tini && \
     apt-get clean && \
     rm -fr /usr/share/doc/* \
-           /usr/share/info/* \
-           /usr/share/linda/* \
-           /usr/share/lintian/overrides/* \
-           /usr/share/locale/* \
-           /usr/share/man/* \
-           /usr/share/doc/kde/HTML/* \
-           /usr/share/gnome/help/* \
-           /usr/share/locale/* \
-           /usr/share/omf/*/*-*.emf \
-           /var/lib/apt/lists/*
+    /usr/share/info/* \
+    /usr/share/linda/* \
+    /usr/share/lintian/overrides/* \
+    /usr/share/locale/* \
+    /usr/share/man/* \
+    /usr/share/doc/kde/HTML/* \
+    /usr/share/gnome/help/* \
+    /usr/share/locale/* \
+    /usr/share/omf/*/*-*.emf \
+    /var/lib/apt/lists/*
 
 EXPOSE 8080
 
@@ -176,4 +208,3 @@ ENV DEBUG="$DEBUG"
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
 CMD ["lake"]
-
