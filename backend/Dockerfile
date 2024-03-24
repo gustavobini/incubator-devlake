@@ -136,14 +136,11 @@ COPY . /app
 ENV GOBIN=/app/bin
 ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib:/usr/local/deps/aarch64/lib/pkgconfig:/usr/local/deps/aarch64/lib
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/local/deps/aarch64/lib
-
-RUN printenv
-RUN ls -la /tmp/build/aarch64/libgit2-1.3.2/build
-RUN ls -la /usr/local/deps/aarch64/lib
-RUN ls -la /usr/local/deps/aarch64/lib/pkgconfig
+ENV E2E_DB_URL="mysql://merico:merico@localhost:3306/lake_test?charset=utf8mb4&parseTime=True&loc=UTC"
+ENV DB_URL="mysql://merico:merico@localhost:3306/lake_test?charset=utf8mb4&parseTime=True&loc=UTC"
 
 RUN which pkg-config
-RUN make mock && make unit-test-go
+RUN make e2e-test-go-plugins
 
 FROM python:3.9-slim-bullseye as base
 

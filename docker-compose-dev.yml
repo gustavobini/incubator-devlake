@@ -32,18 +32,35 @@ services:
       --collation-server=utf8mb4_bin
       --skip-log-bin
 
-  # postgres:
-  #   image: postgres:14.2
-  #   volumes:
-  #     - postgres-storage:/var/lib/postgresql
-  #   restart: always
-  #   ports:
-  #     - 5432:5432
-  #   environment:
-  #     POSTGRES_DB: lake
-  #     POSTGRES_USER: merico
-  #     POSTGRES_PASSWORD: merico
-  #     TZ: UTC
+  mysql_test:
+    image: mysql:8
+    volumes:
+      - mysql_test-storage:/var/lib/mysql
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: lake_test
+      MYSQL_USER: merico
+      MYSQL_PASSWORD: merico
+      TZ: UTC
+    command: --character-set-server=utf8mb4
+      --collation-server=utf8mb4_bin
+      --skip-log-bin
+
+  postgres:
+    image: postgres:14.2
+    volumes:
+      - postgres-storage:/var/lib/postgresql
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: lake
+      POSTGRES_USER: merico
+      POSTGRES_PASSWORD: merico
+      TZ: UTC
 
   # grafana:
   #   image: devlake.docker.scarf.sh/apache/devlake-dashboard:latest
@@ -73,7 +90,7 @@ services:
         HTTPS_PROXY: "${HTTPS_PROXY}"
         GOPROXY: "${GOPROXY}"
     ports:
-      - 8080:8080
+      - 8081:8081
     restart: always
     volumes:
       - devlake-log:/app/logs
@@ -136,6 +153,7 @@ services:
 
 volumes:
   mysql-storage:
+  mysql_test-storage:
   grafana-storage:
   postgres-storage:
   devlake-log:
